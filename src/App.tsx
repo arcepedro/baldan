@@ -113,7 +113,12 @@ export default function App() {
 
   const [currentView, setCurrentView] = useState<ViewState>("intro");
   const [formData, setFormData] = useState(defaultForm);
-  const [scriptUrl, setScriptUrl] = useState("");
+  const [scriptUrl, setScriptUrl] = useState(() => {
+    return (
+      localStorage.getItem("baldan_script_url") ||
+      "https://script.google.com/macros/s/AKfycbwg0nqWkvSI3SqV17Ov5Vz2V_SqUvw-M-Jq9A5tZmaL05zFBwMuo32irfNoAeDccceYvw/exec"
+    );
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -161,11 +166,12 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Fetch dashboard data on app start so it's pre-loaded
   useEffect(() => {
-    if (currentView === "dashboard" && scriptUrl) {
+    if (scriptUrl) {
       fetchDashboardData();
     }
-  }, [currentView, scriptUrl]);
+  }, [scriptUrl]);
 
   const fetchDashboardData = async () => {
     setIsLoadingDashboard(true);
@@ -293,14 +299,6 @@ export default function App() {
       valor: parseFloat((u.sum / u.count).toFixed(2)),
     }))
     .sort((a: any, b: any) => b.valor - a.valor);
-
-  // Load Settings
-  useEffect(() => {
-    const savedUrl = localStorage.getItem("baldan_script_url");
-    if (savedUrl) {
-      setScriptUrl(savedUrl);
-    }
-  }, []);
 
   // Calculation for internal display
   const mediaVal = () => {

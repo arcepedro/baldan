@@ -1,0 +1,20 @@
+{
+  "short_name": "Baldan",
+  "name": "Baldan App",
+  "icons": [
+    {
+      "src": "https://ifudxfllenrtbhollajq.supabase.co/storage/v1/object/sign/baldan/Imagem1.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MzYxYzhmMC1mYjlhLTRlOGItOTFiYi0wZDVhNjdkMDE2YzEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJiYWxkYW4vSW1hZ2VtMS5wbmciLCJpYXQiOjE3NzgwNzA4ODIsImV4cCI6MTgwOTYwNjg4Mn0.KzBPNMMRdNDJgnd4wPkngIAdFzNA_3i24VwsK6v4GQg",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://ifudxfllenrtbhollajq.supabase.co/storage/v1/object/sign/baldan/Imagem1.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV80MzYxYzhmMC1mYjlhLTRlOGItOTFiYi0wZDVhNjdkMDE2YzEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJiYWxkYW4vSW1hZ2VtMS5wbmciLCJpYXQiOjE3NzgwNzA4ODIsImV4cCI6MTgwOTYwNjg4Mn0.KzBPNMMRdNDJgnd4wPkngIAdFzNA_3i24VwsK6v4GQg",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "theme_color": "#8C181E"
+}
