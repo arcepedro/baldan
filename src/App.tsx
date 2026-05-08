@@ -50,7 +50,7 @@ const TopChartCard = ({ data, dataKey, title, color }: any) => {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={sortedData}
-            margin={{ top: 20, right: 20, left: -20, bottom: 0 }}
+            margin={{ top: 20, right: 20, left: -20, bottom: 20 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -61,12 +61,31 @@ const TopChartCard = ({ data, dataKey, title, color }: any) => {
             <XAxis
               dataKey="name"
               type="category"
-              tick={{ fontSize: 9, fill: "#64748B" }}
+              tick={(props: any) => {
+                const { x, y, payload } = props;
+                // Only show part of the string or rotate if we want axis labels
+                // For now, let's show rotated labels below
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text
+                      x={0}
+                      y={0}
+                      dy={16}
+                      textAnchor="end"
+                      fill="#64748B"
+                      transform="rotate(-45)"
+                      fontSize={8}
+                    >
+                      {payload.value.length > 20
+                        ? payload.value.substring(0, 17) + "..."
+                        : payload.value}
+                    </text>
+                  </g>
+                );
+              }}
               axisLine={false}
               tickLine={false}
-              tickFormatter={(val: string) =>
-                val.length > 10 ? val.substring(0, 8) + "..." : val
-              }
+              height={50}
             />
             <YAxis
               type="number"
@@ -131,20 +150,23 @@ export default function App() {
     usina: string[];
     modalidade: string[];
     operacao: string[];
-    produtoDesc: string;
+    produtos: string[];
   }>({
     usina: [],
     modalidade: [],
     operacao: [],
-    produtoDesc: "",
+    produtos: [],
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [isolatedSeries, setIsolatedSeries] = useState<string | null>(null);
+  const [produtoSearch, setProdutoSearch] = useState("");
+  const [showProdutoDropdown, setShowProdutoDropdown] = useState(false);
   const [rankingMetric, setRankingMetric] = useState<
-    "media" | "dias30" | "dias60" | "dias90"
+    "media" | "dias30" | "dias60" | "dias90" | "dias120"
   >("media");
 
   const toggleFilter = (
-    type: "usina" | "modalidade" | "operacao",
+    type: "usina" | "modalidade" | "operacao" | "produtos",
     value: string,
   ) => {
     setDashboardFilters((prev) => {
@@ -212,6 +234,13 @@ export default function App() {
         .filter(Boolean),
     ),
   ) as string[];
+  const uniqueProdutos = Array.from(
+    new Set(
+      dashboardData
+        .map((item: any) => String(item.produtos || ""))
+        .filter(Boolean),
+    ),
+  ).sort() as string[];
 
   const dashboardRanking = dashboardData
     .filter((item: any) => {
@@ -231,10 +260,8 @@ export default function App() {
       )
         return false;
       if (
-        dashboardFilters.produtoDesc &&
-        !String(item.produtos || "")
-          .toLowerCase()
-          .includes(dashboardFilters.produtoDesc.toLowerCase())
+        dashboardFilters.produtos.length > 0 &&
+        !dashboardFilters.produtos.includes(String(item.produtos || ""))
       )
         return false;
       return true;
@@ -277,6 +304,14 @@ export default function App() {
       avg: calcAverage(dashboardRanking, "dias60"),
       best: getBest(dashboardRanking, "dias60"),
     },
+    dias90: {
+      avg: calcAverage(dashboardRanking, "dias90"),
+      best: getBest(dashboardRanking, "dias90"),
+    },
+    dias120: {
+      avg: calcAverage(dashboardRanking, "dias120"),
+      best: getBest(dashboardRanking, "dias120"),
+    },
   };
 
   const mediaByUsinaMap = dashboardRanking.reduce(
@@ -302,7 +337,12 @@ export default function App() {
 
   // Calculation for internal display
   const mediaVal = () => {
-    const values = [formData.dias30, formData.dias60, formData.dias90]
+    const values = [
+      formData.dias30,
+      formData.dias60,
+      formData.dias90,
+      formData.dias120,
+    ]
       .map((v) => parseFloat(v))
       .filter((v) => !isNaN(v));
 
@@ -502,7 +542,7 @@ export default function App() {
               </button>
             </div>
           ) : dashboardRanking.length === 0 &&
-            !dashboardFilters.produtoDesc &&
+            dashboardFilters.produtos.length === 0 &&
             dashboardFilters.usina.length === 0 &&
             dashboardFilters.modalidade.length === 0 &&
             dashboardFilters.operacao.length === 0 ? (
@@ -514,31 +554,90 @@ export default function App() {
               {/* FILTERS & METRIC */}
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col md:flex-row gap-3">
-                  <div className="flex-1 bg-white rounded-xl border border-slate-200 overflow-hidden px-4 py-2 flex items-center shadow-sm">
-                    <input
-                      type="text"
-                      placeholder="Filtrar por Produto..."
-                      className="w-full text-sm font-medium outline-none bg-transparent text-slate-700 placeholder-slate-400"
-                      value={dashboardFilters.produtoDesc}
-                      onChange={(e) =>
-                        setDashboardFilters({
-                          ...dashboardFilters,
-                          produtoDesc: e.target.value,
-                        })
-                      }
-                    />
-                    {dashboardFilters.produtoDesc && (
-                      <button
-                        onClick={() =>
-                          setDashboardFilters({
-                            ...dashboardFilters,
-                            produtoDesc: "",
-                          })
+                  <div className="flex-1 bg-white rounded-xl border border-slate-200 overflow-visible px-4 py-2 flex flex-col shadow-sm relative">
+                    <div className="flex flex-wrap gap-2 items-center min-h-[24px]">
+                      {dashboardFilters.produtos.map((p) => (
+                        <div
+                          key={p}
+                          className="bg-slate-100 text-[#8C181E] px-2 py-1 flex items-center gap-1 rounded-md text-xs font-semibold"
+                        >
+                          {p}
+                          <button
+                            onClick={() => toggleFilter("produtos", p)}
+                            className="hover:text-red-500"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      <input
+                        type="text"
+                        placeholder={
+                          dashboardFilters.produtos.length === 0
+                            ? "Filtrar por Produtos..."
+                            : "Adicionar produto..."
                         }
-                        className="text-slate-400 hover:text-slate-600"
-                      >
-                        <X size={16} />
-                      </button>
+                        className="flex-1 text-sm font-medium outline-none bg-transparent text-slate-700 placeholder-slate-400 min-w-[150px]"
+                        value={produtoSearch}
+                        onChange={(e) => {
+                          setProdutoSearch(e.target.value);
+                          setShowProdutoDropdown(true);
+                        }}
+                        onFocus={() => setShowProdutoDropdown(true)}
+                        onBlur={() => {
+                          // delay closing so click on dropdown works
+                          setTimeout(() => setShowProdutoDropdown(false), 200);
+                        }}
+                      />
+                      {dashboardFilters.produtos.length > 0 && (
+                        <button
+                          onClick={() =>
+                            setDashboardFilters({
+                              ...dashboardFilters,
+                              produtos: [],
+                            })
+                          }
+                          className="text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                    {showProdutoDropdown && (
+                      <div className="absolute top-full left-0 right-0 mt-1 max-h-[200px] overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+                        {uniqueProdutos
+                          .filter(
+                            (p) =>
+                              p
+                                .toLowerCase()
+                                .includes(produtoSearch.toLowerCase()) &&
+                              !dashboardFilters.produtos.includes(p),
+                          )
+                          .map((p) => (
+                            <button
+                              key={p}
+                              className="w-full text-left px-4 py-2 hover:bg-slate-50 text-sm font-medium text-slate-700 transition-colors"
+                              onClick={() => {
+                                toggleFilter("produtos", p);
+                                setProdutoSearch("");
+                                setShowProdutoDropdown(false);
+                              }}
+                            >
+                              {p}
+                            </button>
+                          ))}
+                        {uniqueProdutos.filter(
+                          (p) =>
+                            p
+                              .toLowerCase()
+                              .includes(produtoSearch.toLowerCase()) &&
+                            !dashboardFilters.produtos.includes(p),
+                        ).length === 0 && (
+                          <div className="px-4 py-3 text-sm text-slate-500">
+                            Nenhum produto encontrado.
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -555,6 +654,7 @@ export default function App() {
                         <option value="dias30">30 Dias</option>
                         <option value="dias60">60 Dias</option>
                         <option value="dias90">90 Dias</option>
+                        <option value="dias120">120 Dias</option>
                       </select>
                       <ChevronDown
                         size={16}
@@ -586,7 +686,7 @@ export default function App() {
                               usina: [],
                               modalidade: [],
                               operacao: [],
-                              produtoDesc: dashboardFilters.produtoDesc,
+                              produtos: dashboardFilters.produtos,
                             })
                           }
                           className="text-xs text-red-600 font-medium flex items-center"
@@ -652,8 +752,8 @@ export default function App() {
                 )}
               </div>
 
-              {/* TOP SECTION: 3 COLUMNS */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              {/* TOP SECTION: 4 COLUMNS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
                 <TopChartCard
                   title="30 Dias"
                   dataKey="dias30"
@@ -672,6 +772,12 @@ export default function App() {
                   data={dashboardRanking}
                   color="#D97706"
                 />
+                <TopChartCard
+                  title="120 Dias"
+                  dataKey="dias120"
+                  data={dashboardRanking}
+                  color="#8B5CF6"
+                />
               </div>
 
               {dashboardRanking.length === 0 ? (
@@ -682,17 +788,10 @@ export default function App() {
                 <div className="space-y-6">
                   {/* MAIN CHART */}
                   <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col h-[500px]">
-                    <h2 className="text-center font-bold text-slate-800 mb-4 text-sm uppercase tracking-wider">
-                      Top{" "}
-                      {rankingMetric === "media"
-                        ? "Médias"
-                        : rankingMetric.replace("dias", "") + " Dias"}{" "}
-                      por Produto
-                    </h2>
                     <div className="flex-1 w-full min-h-0 pl-1 pr-1">
                       <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
-                          data={dashboardRanking.slice(0, 10)}
+                          data={dashboardRanking}
                           margin={{ top: 30, right: 20, left: 10, bottom: 20 }}
                         >
                           <CartesianGrid
@@ -730,9 +829,13 @@ export default function App() {
                             }}
                             formatter={(value: any, name: string) => [
                               `${value}`,
-                              name === "valor" || name === "media"
-                                ? "Média"
-                                : name,
+                              name === "valor"
+                                ? rankingMetric === "media"
+                                  ? "Média Geral"
+                                  : rankingMetric.replace("dias", "") + " Dias"
+                                : name === "media"
+                                  ? "Média Geral"
+                                  : name,
                             ]}
                           />
                           {rankingMetric === "media" ? (
@@ -743,55 +846,140 @@ export default function App() {
                                 wrapperStyle={{
                                   fontSize: "11px",
                                   fontWeight: "600",
+                                  cursor: "pointer",
                                 }}
+                                onClick={(e: any) =>
+                                  setIsolatedSeries((prev) =>
+                                    prev === e.dataKey ? null : e.dataKey,
+                                  )
+                                }
                               />
+                              <Bar
+                                dataKey="dias30"
+                                name="30 Dias"
+                                fill="#10B981"
+                                maxBarSize={40}
+                                radius={[4, 4, 0, 0]}
+                                hide={
+                                  isolatedSeries !== null &&
+                                  isolatedSeries !== "dias30"
+                                }
+                              >
+                                <LabelList
+                                  dataKey="dias30"
+                                  position="top"
+                                  style={{
+                                    fontSize: "10px",
+                                    fill: "#10B981",
+                                    fontWeight: "bold",
+                                  }}
+                                  formatter={(val: number) =>
+                                    val === 0 ? "" : val.toFixed(1)
+                                  }
+                                  offset={10}
+                                />
+                              </Bar>
+                              <Bar
+                                dataKey="dias60"
+                                name="60 Dias"
+                                fill="#3B82F6"
+                                maxBarSize={40}
+                                radius={[4, 4, 0, 0]}
+                                hide={
+                                  isolatedSeries !== null &&
+                                  isolatedSeries !== "dias60"
+                                }
+                              >
+                                <LabelList
+                                  dataKey="dias60"
+                                  position="top"
+                                  style={{
+                                    fontSize: "10px",
+                                    fill: "#3B82F6",
+                                    fontWeight: "bold",
+                                  }}
+                                  formatter={(val: number) =>
+                                    val === 0 ? "" : val.toFixed(1)
+                                  }
+                                  offset={10}
+                                />
+                              </Bar>
+                              <Bar
+                                dataKey="dias90"
+                                name="90 Dias"
+                                fill="#F59E0B"
+                                maxBarSize={40}
+                                radius={[4, 4, 0, 0]}
+                                hide={
+                                  isolatedSeries !== null &&
+                                  isolatedSeries !== "dias90"
+                                }
+                              >
+                                <LabelList
+                                  dataKey="dias90"
+                                  position="top"
+                                  style={{
+                                    fontSize: "10px",
+                                    fill: "#F59E0B",
+                                    fontWeight: "bold",
+                                  }}
+                                  formatter={(val: number) =>
+                                    val === 0 ? "" : val.toFixed(1)
+                                  }
+                                  offset={10}
+                                />
+                              </Bar>
+                              <Bar
+                                dataKey="dias120"
+                                name="120 Dias"
+                                fill="#8B5CF6"
+                                maxBarSize={40}
+                                radius={[4, 4, 0, 0]}
+                                hide={
+                                  isolatedSeries !== null &&
+                                  isolatedSeries !== "dias120"
+                                }
+                              >
+                                <LabelList
+                                  dataKey="dias120"
+                                  position="top"
+                                  style={{
+                                    fontSize: "10px",
+                                    fill: "#8B5CF6",
+                                    fontWeight: "bold",
+                                  }}
+                                  formatter={(val: number) =>
+                                    val === 0 ? "" : val.toFixed(1)
+                                  }
+                                  offset={10}
+                                />
+                              </Bar>
                               <Bar
                                 dataKey="media"
                                 name="Média Geral"
                                 fill="#2196F3"
-                                radius={[6, 6, 0, 0]}
-                                barSize={40}
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={40}
                                 fillOpacity={0.9}
+                                hide={
+                                  isolatedSeries !== null &&
+                                  isolatedSeries !== "media"
+                                }
                               >
                                 <LabelList
                                   dataKey="media"
                                   position="top"
                                   style={{
-                                    fontSize: "11px",
+                                    fontSize: "10px",
                                     fill: "#2196F3",
                                     fontWeight: "bold",
                                   }}
-                                  formatter={(val: number) => val.toFixed(1)}
+                                  formatter={(val: number) =>
+                                    val === 0 ? "" : val.toFixed(1)
+                                  }
                                   offset={10}
                                 />
                               </Bar>
-                              <Line
-                                type="monotone"
-                                dataKey="dias30"
-                                name="30 Dias"
-                                stroke="#10B981"
-                                strokeWidth={3}
-                                dot={{ fill: "#10B981", r: 4, strokeWidth: 0 }}
-                                activeDot={{ r: 6 }}
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="dias60"
-                                name="60 Dias"
-                                stroke="#3B82F6"
-                                strokeWidth={3}
-                                dot={{ fill: "#3B82F6", r: 4, strokeWidth: 0 }}
-                                activeDot={{ r: 6 }}
-                              />
-                              <Line
-                                type="monotone"
-                                dataKey="dias90"
-                                name="90 Dias"
-                                stroke="#F59E0B"
-                                strokeWidth={3}
-                                dot={{ fill: "#F59E0B", r: 4, strokeWidth: 0 }}
-                                activeDot={{ r: 6 }}
-                              />
                             </>
                           ) : (
                             <Bar
@@ -828,14 +1016,26 @@ export default function App() {
                         Desempenho por Produto
                       </h2>
                       <div className="overflow-y-auto w-full flex-1 pr-1 custom-scrollbar">
-                        <table className="w-full text-left text-xs min-w-[300px]">
+                        <table className="w-full text-left text-xs min-w-[600px]">
                           <thead className="sticky top-0 bg-white/90 backdrop-blur pb-2 z-10 text-slate-400">
                             <tr>
-                              <th className="font-semibold py-2 w-[40%]">
+                              <th className="font-semibold py-2 w-[25%]">
                                 Produto
                               </th>
                               <th className="font-semibold py-2">Dose</th>
-                              <th className="font-semibold py-2 w-[40%] text-right pr-2">
+                              <th className="font-semibold py-2 text-right pr-2">
+                                30 Dias
+                              </th>
+                              <th className="font-semibold py-2 text-right pr-2">
+                                60 Dias
+                              </th>
+                              <th className="font-semibold py-2 text-right pr-2">
+                                90 Dias
+                              </th>
+                              <th className="font-semibold py-2 text-right pr-2">
+                                120 Dias
+                              </th>
+                              <th className="font-semibold py-2 w-[20%] text-right pr-2">
                                 Média
                               </th>
                             </tr>
@@ -849,15 +1049,75 @@ export default function App() {
                                 >
                                   {item.name}
                                 </td>
-                                <td className="py-3 text-slate-500 font-medium">
+                                <td className="py-3 text-slate-500 font-medium whitespace-nowrap">
                                   {item.dose}
+                                </td>
+                                <td className="py-3 pr-2">
+                                  <div className="flex items-center gap-2 justify-end">
+                                    <span className="font-bold text-slate-700">
+                                      {item.dias30}
+                                    </span>
+                                    <div className="h-4 w-12 bg-slate-100 rounded-sm overflow-hidden flex">
+                                      <div
+                                        className="h-full bg-[#10B981]"
+                                        style={{
+                                          width: `${Math.min(100, (item.dias30 / (kpis.dias30.best.dias30 || 1)) * 100)}%`,
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 pr-2">
+                                  <div className="flex items-center gap-2 justify-end">
+                                    <span className="font-bold text-slate-700">
+                                      {item.dias60}
+                                    </span>
+                                    <div className="h-4 w-12 bg-slate-100 rounded-sm overflow-hidden flex">
+                                      <div
+                                        className="h-full bg-[#3B82F6]"
+                                        style={{
+                                          width: `${Math.min(100, (item.dias60 / (kpis.dias60.best.dias60 || 1)) * 100)}%`,
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 pr-2">
+                                  <div className="flex items-center gap-2 justify-end">
+                                    <span className="font-bold text-slate-700">
+                                      {item.dias90}
+                                    </span>
+                                    <div className="h-4 w-12 bg-slate-100 rounded-sm overflow-hidden flex">
+                                      <div
+                                        className="h-full bg-[#F59E0B]"
+                                        style={{
+                                          width: `${Math.min(100, (item.dias90 / (kpis.dias90.best.dias90 || 1)) * 100)}%`,
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 pr-2">
+                                  <div className="flex items-center gap-2 justify-end">
+                                    <span className="font-bold text-slate-700">
+                                      {item.dias120}
+                                    </span>
+                                    <div className="h-4 w-12 bg-slate-100 rounded-sm overflow-hidden flex">
+                                      <div
+                                        className="h-full bg-[#8B5CF6]"
+                                        style={{
+                                          width: `${Math.min(100, (item.dias120 / (kpis.dias120.best.dias120 || 1)) * 100)}%`,
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
                                 </td>
                                 <td className="py-3 pr-2">
                                   <div className="flex items-center gap-2 justify-end">
                                     <span className="font-bold text-slate-700">
                                       {item.media}
                                     </span>
-                                    <div className="h-4 w-16 bg-slate-100 rounded-sm overflow-hidden flex">
+                                    <div className="h-4 w-12 bg-slate-100 rounded-sm overflow-hidden flex">
                                       <div
                                         className="h-full bg-[#8C181E]"
                                         style={{
@@ -1126,6 +1386,26 @@ export default function App() {
                   placeholder="0.0"
                 />
               </div>
+
+              {/* 8. 120 Dias */}
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="dias120"
+                  className="block text-xs font-semibold text-slate-600"
+                >
+                  8. 120 Dias
+                </label>
+                <input
+                  id="dias120"
+                  name="dias120"
+                  type="number"
+                  step="any"
+                  value={formData.dias120}
+                  onChange={handleInputChange}
+                  className="w-full p-3 text-center bg-white border border-slate-200 rounded-xl focus:border-[#8C181E] focus:ring-4 focus:ring-[#8C181E]/10 outline-none transition-all text-lg block"
+                  placeholder="0.0"
+                />
+              </div>
             </div>
 
             {/* 9. Média */}
@@ -1147,16 +1427,20 @@ export default function App() {
             >
               10. Modalidade
             </label>
-            <input
+            <select
               id="modalidade"
               name="modalidade"
-              type="text"
               required
               value={formData.modalidade}
               onChange={handleInputChange}
-              className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#8C181E] focus:ring-4 focus:ring-[#8C181E]/10 outline-none transition-all text-lg"
-              placeholder="Digite a Modalidade"
-            />
+              className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#8C181E] focus:ring-4 focus:ring-[#8C181E]/10 outline-none transition-all text-lg appearance-none"
+            >
+              <option value="" disabled>
+                Selecione uma opção
+              </option>
+              <option value="Cana planta">Cana planta</option>
+              <option value="Cana soca">Cana soca</option>
+            </select>
           </div>
 
           {/* 11. Operação */}
@@ -1167,16 +1451,21 @@ export default function App() {
             >
               11. Operação
             </label>
-            <input
+            <select
               id="operacao"
               name="operacao"
-              type="text"
               required
               value={formData.operacao}
               onChange={handleInputChange}
-              className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#8C181E] focus:ring-4 focus:ring-[#8C181E]/10 outline-none transition-all text-lg"
-              placeholder="Digite a Operação"
-            />
+              className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-[#8C181E] focus:ring-4 focus:ring-[#8C181E]/10 outline-none transition-all text-lg appearance-none"
+            >
+              <option value="" disabled>
+                Selecione uma opção
+              </option>
+              <option value="Drone">Drone</option>
+              <option value="Pressurizada">Pressurizada</option>
+              <option value="Tratorizada">Tratorizada</option>
+            </select>
           </div>
 
           {/* Submit Button */}
